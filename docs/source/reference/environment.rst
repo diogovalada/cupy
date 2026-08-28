@@ -36,6 +36,19 @@ Here are the environment variables that CuPy uses at runtime.
   If set to ``1``, :envvar:`CUPY_CACHE_DIR` and :envvar:`CUPY_CACHE_SAVE_CUDA_SOURCE` will be ignored, and the cache is in memory.
   This environment variable allows reducing disk I/O, but is ignoed when ``nvcc`` is set to be the compiler backend.
 
+.. envvar:: CUPY_NVRTC_USE_PCH
+
+  Default: ``0``
+
+  If set to ``1``, precompiled headers (PCH) will be used to drastically speed up compilation when many kernels are compiled
+  (e.g. because the CuPy kernel cache is empty or due to ``CUPY_CACHE_IN_MEMORY``).
+  I.e. if set, CuPy always passes the ``--pch`` option to all NVRTC kernel compilations.
+
+  PCH does come at at the cost of temporary files which can be configured further, see:
+  https://docs.nvidia.com/cuda/nvrtc/index.html#precompiled-header-pch-cuda-12-8
+
+  The option is only available for CUDA 12.8 or later.
+
 .. envvar:: CUPY_DISABLE_JITIFY_CACHE
 
   Default: ``0``
@@ -71,7 +84,7 @@ Here are the environment variables that CuPy uses at runtime.
 .. envvar:: CUPY_EXPERIMENTAL_SLICE_COPY
 
   Default: ``0``
-  
+
   If set to ``1``, the following syntax is enabled::
 
     cupy_ndarray[:] = numpy_ndarray
@@ -80,8 +93,15 @@ Here are the environment variables that CuPy uses at runtime.
 
   Default: ``"cub"`` (In ROCm HIP environment, the default value is ``""``. i.e., no accelerators are used.)
 
-  A comma-separated string of backend names (``cub``, ``cutensor``, or ``cutensornet``) which indicates the acceleration backends used in CuPy operations and its priority (in descending order).
+  A comma-separated string of backend names (``cub``, ``cutensor``, ``hiptensor``, or ``cutensornet``) which indicates the acceleration backends used in CuPy operations and its priority (in descending order).
   By default, all accelerators are disabled on HIP and only CUB is enabled on CUDA.
+  The ``hiptensor`` backend requires hipTensor 2.3.0 or later. Unsupported
+  operations and GPU architectures fall back to CuPy's own implementation.
+  CuPy currently enables transparent hipTensor acceleration for supported
+  reductions. Elementwise operations, Einstein summation, and cuTENSORMg are
+  unavailable as transparent accelerators. The corresponding high-level
+  :mod:`cupyx.cutensor` elementwise and contraction APIs remain compatible on
+  HIP through correctness fallbacks implemented with CuPy operations.
 
 .. envvar:: CUPY_TF32
 
@@ -154,6 +174,11 @@ These environment variables are used during installation (building CuPy from sou
 .. envvar:: CUTENSOR_PATH
 
   Path to the cuTENSOR root directory that contains ``lib`` and ``include`` directories. (experimental)
+
+.. envvar:: HIPTENSOR_PATH
+
+  Path to a hipTensor 2.3.0 or later root directory that contains ``lib`` and
+  ``include`` directories. (experimental)
 
 .. envvar:: CUPY_INSTALL_USE_HIP
 

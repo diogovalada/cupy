@@ -143,7 +143,6 @@ _cuda_files = [
     'cupy.cuda.graph',
     'cupy.cuda.texture',
     'cupy.fft._cache',
-    'cupy.fft._callback',
     'cupy.lib._polynomial',
     'cupy._util',
     'cupyx.scipy.ndimage._bbox_slices',
@@ -167,7 +166,7 @@ def get_features(ctx: Context) -> dict[str, Feature]:
         'file': _cuda_files + [
             'cupy_backends.cuda.libs.nvtx',
             'cupy_backends.cuda.libs.cusolver',
-            'cupyx.cusolver',
+            'cupyx._cusolver',
         ],
         'include': [
             'hip/hip_runtime_api.h',
@@ -186,6 +185,7 @@ def get_features(ctx: Context) -> dict[str, Feature]:
             'hiprand',
             'hipsparse',
             'rocfft',
+            'roctracer64',  # cudaProfilerStart/Stop -> roctracer_start/stop
             'roctx64',
             'rocblas',
             'rocsolver',
@@ -199,7 +199,7 @@ def get_features(ctx: Context) -> dict[str, Feature]:
         'required': True,
         'file': [
             'cupy_backends.cuda.libs.cusolver',
-            'cupyx.cusolver',
+            'cupyx._cusolver',
         ],
         'include': [
             'cusolverDn.h',
@@ -239,7 +239,7 @@ def get_features(ctx: Context) -> dict[str, Feature]:
         'name': 'cutensor',
         'file': [
             'cupy_backends.cuda.libs.cutensor',
-            'cupyx.cutensor',
+            'cupyx._cutensor',
         ],
         'include': [
             'cutensor.h',
@@ -363,6 +363,22 @@ def get_features(ctx: Context) -> dict[str, Feature]:
         'check_method': build.check_nccl_version,
         'version_method': build.get_nccl_version,
     }
+    HIP_cutensor = {
+        'name': 'cutensor',
+        'file': [
+            'cupy_backends.cuda.libs.cutensor',
+            'cupyx._cutensor',
+        ],
+        'include': [
+            'cupy/hiptensor.h',
+        ],
+        'libraries': [
+            'hiptensor',
+            'hipblas',
+        ],
+        'check_method': build.check_hiptensor_version,
+        'version_method': build.get_hiptensor_version,
+    }
     HIP_thrust = {
         'name': 'thrust',
         'required': True,
@@ -409,6 +425,7 @@ def get_features(ctx: Context) -> dict[str, Feature]:
             _from_dict(HIP_cuda_nvtx_cusolver, ctx),
             _from_dict(HIP_cub, ctx),
             _from_dict(HIP_nccl, ctx),
+            _from_dict(HIP_cutensor, ctx),
             _from_dict(HIP_random, ctx),
             _from_dict(HIP_thrust, ctx),
             _from_dict(COMMON_dlpack, ctx),
@@ -431,13 +448,16 @@ def get_features(ctx: Context) -> dict[str, Feature]:
 
 
 class CUDA_cuda(Feature):
-    minimum_cuda_version = 11020
+    _minimum_cuda_version = 12000
+    _minimum_cuda_version_str = "12.0"
 
     def __init__(self, ctx: Context):
         super().__init__(ctx)
         self.name = 'cuda'
         self.required = True
-        self.modules = _cuda_files
+        self.modules = _cuda_files + [
+            'cupy.fft._callback',
+        ]
         self.includes = [
             'cublas_v2.h',
             'cuda.h',
@@ -474,9 +494,9 @@ class CUDA_cuda(Feature):
 
         self._version = int(out)
 
-        if self._version < self.minimum_cuda_version:
+        if self._version < self._minimum_cuda_version:
             utils.print_warning(
-                'CUDA version is too old: %d' % self._version,
-                'CUDA 11.2 or newer is required')
+                f'CUDA version is too old: {self._version}',
+                f'CUDA {self._minimum_cuda_version_str} or newer is required')
             return False
         return True

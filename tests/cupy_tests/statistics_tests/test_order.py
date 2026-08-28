@@ -12,7 +12,7 @@ from cupy import testing
 
 
 _all_methods = (
-    # 'inverted_cdf',               # TODO(takagi) Not implemented
+    'inverted_cdf',
     # 'averaged_inverted_cdf',      # TODO(takagi) Not implemented
     # 'closest_observation',        # TODO(takagi) Not implemented
     # 'interpolated_inverted_cdf',  # TODO(takagi) Not implemented
@@ -26,6 +26,24 @@ _all_methods = (
     'midpoint',
     'nearest',
 )
+
+
+@pytest.fixture
+def _fix_gamma(monkeypatch):
+    if numpy.__version__ == "2.4.1":
+        # NumPy 2.4.0 had a surprisingly large change, but I (seberg)
+        # incorrectly undid the change, making things maybe worse...
+        # this fixes that...
+        # See also https://github.com/numpy/numpy/pull/30710
+        def _get_gamma(virtual_indexes, previous_indexes, method):
+            gamma = numpy.asanyarray(virtual_indexes - previous_indexes)
+            gamma = method["fix_gamma"](gamma, virtual_indexes)
+            return numpy.asanyarray(gamma, dtype=virtual_indexes.dtype)
+
+        monkeypatch.setattr(
+            numpy.lib._function_base_impl, "_get_gamma", _get_gamma)
+
+    yield
 
 
 def for_all_methods(name='method'):
@@ -45,6 +63,7 @@ class TestQuantile:
 
     # See gh-4453
     @testing.for_float_dtypes()
+    @pytest.mark.thread_unsafe(reason="allocator setting not thread-safe")
     def test_percentile_memory_access(self, dtype):
         # Create an allocator that guarantees array allocated in
         # cupy.percentile call will be followed by a NaN
@@ -82,6 +101,7 @@ class TestQuantile:
                 xp.quantile(a, q, axis=-1, method='deadbeef')
 
 
+@pytest.mark.usefixtures("_fix_gamma")
 @testing.with_requires('numpy>=2.0')
 @for_all_methods()
 class TestQuantileMethods:
